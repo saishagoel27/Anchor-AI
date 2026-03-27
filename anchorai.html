@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnchorAI — Grounded Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0a0a0b;
+    --surface:   #111114;
+    --border:    #1e1e24;
+    --border-hi: #2e2e38;
+    --text:      #e8e8ec;
+    --muted:     #55555f;
+    --accent:    #4f7cff;
+    --accent-lo: rgba(79,124,255,.08);
+    --accent-md: rgba(79,124,255,.18);
+    --source:    #1a2a1a;
+    --source-border: #2a4a2a;
+    --source-text: #7ec87e;
+    --warn:      #ff6b4f;
+    --warn-lo:   rgba(255,107,79,.08);
+    --radius:    6px;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    overflow: hidden;
+  }
+
+  /* ── APP SHELL ── */
+  .app {
+    display: grid;
+    grid-template-rows: 52px 1fr;
+    grid-template-columns: 1fr 1fr;
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: -.3px;
+    color: var(--text);
+  }
+
+  .logo-icon {
+    width: 22px;
+    height: 22px;
+    background: var(--accent);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background .3s;
+  }
+  .status-dot.ready  { background: #4caf76; }
+  .status-dot.busy   { background: var(--accent); animation: pulse 1s infinite; }
+  .status-dot.anchored { background: #4caf76; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; } 50% { opacity: .3; }
+  }
+
+  #status-text { transition: color .2s; }
+
+  .anchor-badge {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: var(--accent-lo);
+    border: 1px solid var(--accent-md);
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    max-width: 260px;
+    overflow: hidden;
+  }
+  .anchor-badge.visible { display: flex; }
+  .anchor-badge-label { opacity: .6; flex-shrink: 0; }
+  .anchor-badge-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── LEFT PANEL — CHAT ── */
+  .panel-chat {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .panel-label {
+    padding: 10px 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  /* Source Input Zone */
+  .source-zone {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .source-zone label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .06em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .source-input-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .source-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border-hi);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+    transition: border-color .2s;
+  }
+  .source-input::placeholder { color: var(--muted); }
+  .source-input:focus { border-color: var(--accent); }
+
+  .btn {
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity .2s, transform .1s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { opacity: .88; }
+  .btn-primary:disabled { opacity: .35; cursor: not-allowed; }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--muted);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .source-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  .tab {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    cursor: pointer;
+    border: 1px solid var(--border-hi);
+    color: var(--muted);
+    background: transparent;
+    transition: all .15s;
+    letter-spacing: .04em;
+  }
+  .tab.active {
+    background: var(--accent-lo);
+    border-color: var(--accent-md);
+    color: var(--accent);
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .file-drop {
+    border: 1.5px dashed var(--border-hi);
+    border-radius: var(--radius);
+    padding: 14px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .file-drop:hover, .file-drop.drag-over {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-lo);
+  }
+  #file-input { display: none; }
+
+  /* Chat Messages */
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-hi) transparent;
+  }
+
+  .empty-state {
+    margin: auto;
+    text-align: center;
+    color: var(--muted);
+  }
+  .empty-state-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+    opacity: .4;
+  }
+  .empty-state h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text);
+    opacity: .5;
+  }
+  .empty-state p {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.7;
+    max-width: 240px;
+  }
+
+  .message {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    animation: fadeUp .25s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .message-role {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .message.user .message-role { color: var(--accent); opacity: .7; }
+
+  .message-body {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  .message.user .message-body {
+    background: var(--accent-lo);
+    border-color: var(--accent-md);
+  }
+
+  .not-found-msg .message-body {
+    background: var(--warn-lo);
+    border-color: rgba(255,107,79,.25);
+    color: var(--warn);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  /* Chat Input */
+  .chat-input-area {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    gap: 8px;
+  }
+
+  .chat-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border-hi);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    resize: none;
+    height: 42px;
+    transition: border-color .2s, height .15s;
+    scrollbar-width: none;
+  }
+  .chat-input::placeholder { color: var(--muted); }
+  .chat-input:focus { border-color: var(--accent); }
+  .chat-input:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── RIGHT PANEL — SOURCE ── */
+  .panel-source {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .source-display {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-hi) transparent;
+  }
+
+  .source-empty {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    text-align: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .source-empty-icon { font-size: 32px; opacity: .2; }
+
+  .source-card {
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+    animation: fadeUp .3s ease;
+  }
+  .source-card.visible { display: flex; }
+
+  .source-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .excerpt-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--source-text);
+    opacity: .7;
+    margin-bottom: 6px;
+  }
+
+  .excerpt-block {
+    background: var(--source);
+    border: 1px solid var(--source-border);
+    border-left: 3px solid var(--source-text);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.75;
+    color: #b8e8b8;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .answer-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    opacity: .7;
+    margin-bottom: 6px;
+    margin-top: 6px;
+  }
+
+  .answer-block {
+    background: var(--accent-lo);
+    border: 1px solid var(--accent-md);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .source-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+
+  .confidence-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .confidence-bar-wrap {
+    flex: 1;
+    height: 3px;
+    background: var(--border-hi);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .confidence-bar {
+    height: 100%;
+    background: var(--source-text);
+    border-radius: 2px;
+    transition: width .6s ease;
+  }
+  .confidence-val { color: var(--source-text); }
+
+  /* ── TYPING INDICATOR ── */
+  .typing {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: fit-content;
+  }
+  .typing span {
+    width: 5px; height: 5px;
+    background: var(--muted);
+    border-radius: 50%;
+    animation: bounce .9s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: .15s; }
+  .typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce {
+    0%,60%,100% { transform: translateY(0); }
+    30% { transform: translateY(-5px); }
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⚓</div>
+      Anchor<span>AI</span>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">No source loaded</span>
+    </div>
+
+    <div class="anchor-badge" id="anchor-badge">
+      <span class="anchor-badge-label">Anchored to</span>
+      <span class="anchor-badge-value" id="anchor-badge-value">—</span>
+    </div>
+  </header>
+
+  <!-- LEFT: CHAT PANEL -->
+  <div class="panel-chat">
+    <div class="panel-label">01 — Chat</div>
+
+    <!-- Source Input -->
+    <div class="source-zone">
+      <div class="source-tabs">
+        <button class="tab active" onclick="switchTab('url', this)">URL</button>
+        <button class="tab" onclick="switchTab('text', this)">Paste Text</button>
+        <button class="tab" onclick="switchTab('file', this)">Upload File</button>
+      </div>
+
+      <!-- URL Tab -->
+      <div class="tab-panel active" id="tab-url">
+        <div class="source-input-row">
+          <input class="source-input" id="url-input" type="url"
+            placeholder="https://example.com/document" />
+          <button class="btn btn-primary" id="load-url-btn" onclick="loadSource('url')">Load</button>
+        </div>
+      </div>
+
+      <!-- Text Tab -->
+      <div class="tab-panel" id="tab-text">
+        <div class="source-input-row" style="flex-direction:column; gap:8px;">
+          <textarea class="source-input" id="text-input" rows="3"
+            style="height:auto; resize:vertical;"
+            placeholder="Paste any text, article, or document content here..."></textarea>
+          <button class="btn btn-primary" style="align-self:flex-end"
+            onclick="loadSource('text')">Anchor to this text</button>
+        </div>
+      </div>
+
+      <!-- File Tab -->
+      <div class="tab-panel" id="tab-file">
+        <div class="file-drop" id="file-drop" onclick="document.getElementById('file-input').click()">
+          <div style="font-size:18px;margin-bottom:6px;">📄</div>
+          Drop a <strong>.pdf</strong> or .txt file here, or click to browse
+        </div>
+        <input type="file" id="file-input" accept=".txt,.pdf" onchange="handleFileUpload(this)">
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages" id="messages">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-state-icon">⚓</div>
+        <h3>Nothing anchored yet</h3>
+        <p>Load a URL, paste text, or upload a file above. Then ask anything — every answer will be traceable to your source.</p>
+      </div>
+    </div>
+
+    <!-- Chat Input -->
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chat-input"
+        placeholder="Load a source first, then ask a question..."
+        disabled
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"></textarea>
+      <button class="btn btn-primary" id="send-btn" onclick="sendMessage()" disabled>Ask</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: SOURCE PANEL -->
+  <div class="panel-source">
+    <div class="panel-label" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>02 — Source & Provenance</span>
+      <button class="btn btn-ghost" id="reset-btn" style="display:none;font-size:10px;padding:3px 10px;" onclick="resetAll()">Clear source</button>
+    </div>
+
+    <div class="source-display" id="source-display">
+      <div class="source-empty">
+        <div class="source-empty-icon">🔍</div>
+        <div>Every answer will show<br>its source excerpt here.</div>
+        <div style="margin-top:8px;opacity:.5;">No hallucinations.<br>Full traceability.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const state = {
+  sourceContent: '',
+  sourceLabel: '',
+  isLoaded: false,
+  isProcessing: false,
+  history: []
+};
+
+// ─── TABS ────────────────────────────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ─── STATUS ──────────────────────────────────────────────────────────────────
+function setStatus(state_str, text) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  dot.className = 'status-dot ' + state_str;
+  txt.textContent = text;
+}
+
+// ─── FILE DRAG/DROP ──────────────────────────────────────────────────────────
+const dropZone = document.getElementById('file-drop');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+
+function handleFileUpload(input) {
+  if (input.files[0]) processFile(input.files[0]);
+}
+
+async function processFile(file) {
+  const isPDF = file.name.toLowerCase().endsWith('.pdf');
+
+  if (!isPDF) {
+    // Plain text — read directly in browser, no backend needed
+    const reader = new FileReader();
+    reader.onload = e => {
+      setSource(e.target.result, file.name);
+      dropZone.innerHTML = '✓ ' + file.name + ' loaded';
+    };
+    reader.readAsText(file);
+    return;
+  }
+
+  // PDF — send to backend for extraction
+  dropZone.innerHTML = '⏳ Extracting text from PDF...';
+  setStatus('busy', 'Reading PDF...');
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/parse-pdf-file', {
+      method: 'POST',
+      body: formData
+      // Note: do NOT set Content-Type header — browser sets it automatically
+      // with the correct multipart boundary when using FormData
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      dropZone.innerHTML = '⚠ ' + (err.detail || 'Failed to read PDF');
+      setStatus('', 'PDF read failed');
+      return;
+    }
+
+    const data = await res.json();
+    setSource(data.content, file.name);
+    dropZone.innerHTML = `✓ ${file.name} — ${data.page_count} pages, ${data.word_count.toLocaleString()} words`;
+
+  } catch (e) {
+    dropZone.innerHTML = '⚠ Could not connect to server';
+    setStatus('', 'Connection error');
+  }
+}
+
+// ─── LOAD SOURCE ─────────────────────────────────────────────────────────────
+async function loadSource(type) {
+  if (type === 'url') {
+    const url = document.getElementById('url-input').value.trim();
+    if (!url) return;
+    setStatus('busy', 'Fetching source...');
+    try {
+      // In production: call your backend /fetch-url endpoint
+      // For demo: we simulate with a placeholder
+      const res = await fetchURL(url);
+      setSource(res, url);
+    } catch(e) {
+      setStatus('', 'Failed to fetch URL — try pasting the text instead');
+    }
+  } else if (type === 'text') {
+    const text = document.getElementById('text-input').value.trim();
+    if (!text) return;
+    setSource(text, 'Pasted text');
+  }
+}
+
+async function fetchURL(url) {
+  // This calls your backend proxy — wired in Stage 3
+  const res = await fetch('/api/fetch-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url })
+  });
+  if (!res.ok) throw new Error('Fetch failed');
+  const data = await res.json();
+  return data.content;
+}
+
+function setSource(content, label) {
+  state.sourceContent = content;
+  state.sourceLabel = label;
+  state.isLoaded = true;
+  state.history = [];
+
+  // Trim label for badge
+  const shortLabel = label.length > 40 ? label.slice(0,37) + '...' : label;
+  document.getElementById('anchor-badge-value').textContent = shortLabel;
+  document.getElementById('anchor-badge').classList.add('visible');
+  document.getElementById('reset-btn').style.display = 'block';
+
+  setStatus('anchored', 'Anchored · Ready');
+
+  // Enable chat
+  const ci = document.getElementById('chat-input');
+  const sb = document.getElementById('send-btn');
+  ci.disabled = false;
+  sb.disabled = false;
+  ci.placeholder = 'Ask anything about this source...';
+  ci.focus();
+
+  // Clear empty state
+  document.getElementById('empty-state').style.display = 'none';
+
+  // Show source panel ready state
+  document.getElementById('source-display').innerHTML = `
+    <div style="padding:0;">
+      <div class="source-meta">
+        <span>Source loaded</span>
+        <span>${content.split(' ').length.toLocaleString()} words</span>
+      </div>
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8;">
+        AnchorAI will only answer from this content.<br>
+        Ask a question to see provenance tracking in action.
+      </div>
+      <div style="margin-top:14px;font-family:var(--mono);font-size:10px;color:var(--border-hi);word-break:break-all;">${label}</div>
+    </div>
+  `;
+}
+
+// ─── SEND MESSAGE ────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const question = input.value.trim();
+  if (!question || !state.isLoaded || state.isProcessing) return;
+
+  state.isProcessing = true;
+  input.value = '';
+  input.style.height = '42px';
+  document.getElementById('send-btn').disabled = true;
+  setStatus('busy', 'Answering...');
+
+  // Add user message
+  appendMessage('user', question);
+
+  // Add typing indicator
+  const typingId = 'typing-' + Date.now();
+  appendTyping(typingId);
+
+  try {
+    const result = await callAnchorAPI(question);
+    removeTyping(typingId);
+
+    if (result.found) {
+      appendMessage('assistant', result.answer);
+      showProvenance(result.excerpt, result.answer, result.confidence, question);
+    } else {
+      appendNotFound();
+      showNotFoundProvenance(question);
+    }
+
+    state.history.push({ role: 'user', content: question });
+    state.history.push({ role: 'assistant', content: result.answer || '[Not found in source]' });
+
+  } catch(e) {
+    removeTyping(typingId);
+    appendMessage('assistant', 'Something went wrong. Check your API connection and try again.');
+  }
+
+  state.isProcessing = false;
+  document.getElementById('send-btn').disabled = false;
+  setStatus('anchored', 'Anchored · Ready');
+}
+
+// ─── API CALL ────────────────────────────────────────────────────────────────
+async function callAnchorAPI(question) {
+  // Calls your Flask backend — fully wired in Stage 3
+  const res = await fetch('/api/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question,
+      source: state.sourceContent,
+      history: state.history.slice(-6)
+    })
+  });
+  if (!res.ok) throw new Error('API error');
+  return await res.json();
+}
+
+// ─── UI HELPERS ──────────────────────────────────────────────────────────────
+function appendMessage(role, text) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+  div.innerHTML = `
+    <div class="message-role">${role === 'user' ? 'You' : 'AnchorAI'}</div>
+    <div class="message-body">${escapeHtml(text)}</div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function appendNotFound() {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'message not-found-msg';
+  div.innerHTML = `
+    <div class="message-role">AnchorAI</div>
+    <div class="message-body">⚠ This answer isn't in the source. I won't speculate beyond what I've been shown.</div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function appendTyping(id) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'message';
+  div.id = id;
+  div.innerHTML = `
+    <div class="message-role">AnchorAI</div>
+    <div class="typing"><span></span><span></span><span></span></div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function showProvenance(excerpt, answer, confidence, question) {
+  const conf = confidence || 85;
+  document.getElementById('source-display').innerHTML = `
+    <div class="source-card visible">
+      <div class="source-meta">
+        <span>Q: ${escapeHtml(question.slice(0,60))}${question.length>60?'...':''}</span>
+        <span style="opacity:.4">${new Date().toLocaleTimeString()}</span>
+      </div>
+      <div class="source-divider"></div>
+
+      <div>
+        <div class="excerpt-label">Source excerpt</div>
+        <div class="excerpt-block">${escapeHtml(excerpt)}</div>
+      </div>
+
+      <div>
+        <div class="answer-label">Grounded answer</div>
+        <div class="answer-block">${escapeHtml(answer)}</div>
+      </div>
+
+      <div class="confidence-row">
+        <span>Grounding score</span>
+        <div class="confidence-bar-wrap">
+          <div class="confidence-bar" style="width:${conf}%"></div>
+        </div>
+        <span class="confidence-val">${conf}%</span>
+      </div>
+    </div>
+  `;
+}
+
+function showNotFoundProvenance(question) {
+  document.getElementById('source-display').innerHTML = `
+    <div class="source-card visible">
+      <div class="source-meta">
+        <span>Q: ${escapeHtml(question.slice(0,60))}${question.length>60?'...':''}</span>
+      </div>
+      <div class="source-divider"></div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--warn);line-height:1.8;padding:12px 0;">
+        No matching passage found in the source document.<br><br>
+        AnchorAI does not generate answers from general knowledge — only from the content you've loaded.<br><br>
+        <span style="opacity:.5">This is the feature, not a bug.</span>
+      </div>
+    </div>
+  `;
+}
+
+function resetAll() {
+  state.sourceContent = '';
+  state.sourceLabel = '';
+  state.isLoaded = false;
+  state.history = [];
+  document.getElementById('anchor-badge').classList.remove('visible');
+  document.getElementById('reset-btn').style.display = 'none';
+  document.getElementById('chat-input').disabled = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('chat-input').placeholder = 'Load a source first, then ask a question...';
+  document.getElementById('messages').innerHTML = `
+    <div class="empty-state" id="empty-state">
+      <div class="empty-state-icon">⚓</div>
+      <h3>Nothing anchored yet</h3>
+      <p>Load a URL, paste text, or upload a file above. Then ask anything — every answer will be traceable to your source.</p>
+    </div>
+  `;
+  document.getElementById('source-display').innerHTML = `
+    <div class="source-empty">
+      <div class="source-empty-icon">🔍</div>
+      <div>Every answer will show<br>its source excerpt here.</div>
+      <div style="margin-top:8px;opacity:.5;">No hallucinations.<br>Full traceability.</div>
+    </div>
+  `;
+  document.getElementById('url-input').value = '';
+  document.getElementById('text-input').value = '';
+  setStatus('', 'No source loaded');
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = '42px';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+</script>
+</body>
+</html>
