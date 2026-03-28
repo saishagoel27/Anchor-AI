@@ -1,302 +1,150 @@
-# AnchorAI — "Ask Anything. Anchored to Everything."
-
-**AnchorAI** is a source-grounded LLM chatbot that solves the hallucination problem. Unlike traditional chatbots that confidently guess, AnchorAI *only* answers from sources you provide—citing the exact passage it used, with confidence scores, and refusing to speculate beyond what it's been shown.
-
-> This is a demonstration of the core problem that **Alactic Inc.** is solving at enterprise scale: making AI responses not just fluent, but **grounded and trustworthy**.
+# AnchorAI
+### *Ask anything. Anchored to everything.*
 
 ---
 
-## 🎯 The Problem AnchorAI Solves
+Most AI chatbots have a quiet problem nobody talks about. They answer everything — fluently, confidently, and sometimes completely wrong. You ask a question, you get an answer that sounds right, and you have no way of knowing whether it came from something real or was quietly invented. That gap between fluency and truth is what AnchorAI is designed to close.
 
-Most LLM chatbots have a **trust problem**:
-- ❌ They answer with false confidence, even when they don't know
-- ❌ No way to verify or trace an answer back to a source
-- ❌ Hallucinations undermine decision-making
+The idea is simple. You give AnchorAI a source — a URL, a PDF, a block of text. From that point on, it only speaks from what it has been shown. Every answer comes with the exact sentence it pulled from. When something isn't in the source, it says so instead of guessing. No hallucinations. Full traceability.
 
-**AnchorAI's approach**: Every answer is grounded in a source document. Ask it something it can't find? It says so honestly.
+It is a small-scale version of the same problem Alactic Inc. is solving at enterprise scale — making AI responses grounded in real, verifiable data rather than statistical confidence.
 
 ---
 
-## ✨ Key Features
+## Why it works differently
 
-| Feature | What It Does |
-|---------|-------------|
-| **Source Grounding** | Answers only what exists in the provided source. No outside knowledge, no speculation. |
-| **Exact Citation** | Every answer includes the verbatim excerpt from the source that supports it. |
-| **Confidence Scoring** | Returns 0–100 score reflecting how directly the source supports the answer. |
-| **Multiple Input Formats** | Load sources from URLs, PDF uploads, or paste text directly. |
-| **Conversation Context** | Maintains conversation history for follow-up questions while staying grounded. |
-| **Smart Text Extraction** | Uses BeautifulSoup for web pages and PyMuPDF for PDFs; removes noise (ads, nav, scripts). |
-| **Safe Truncation** | Handles large documents by truncating at ~12,000 words to stay within LLM context limits. |
+Every other chatbot is optimized to always have an answer. AnchorAI is optimized to know when it doesn't. That sounds like a limitation. It's actually the harder engineering problem — teaching a model to refuse gracefully is more interesting than teaching it to respond fluently.
+
+The grounding behavior lives in the system prompt. When you ask a question, the entire source document is embedded into the context alongside a strict set of rules: only answer from this, return the exact excerpt you used, score your confidence honestly, and say nothing if the answer isn't here. Low temperature keeps the model faithful. Structured JSON output keeps the responses consistent and parseable. The result is a chatbot that behaves like a careful researcher rather than a confident guesser.
 
 ---
 
-## 🏗️ Architecture
+## What you can do with it
 
-### How It Works
+Load any of these as a source:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      BROWSER (anchorai.html)                    │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        │                       │                       │
-        ▼                       ▼                       ▼
-   [Load URL]            [Upload PDF]            [Paste Text]
-        │                       │                       │
-        │                       │                    (handled
-        │                       │                    locally,
-        │                       │                    no server)
-        │                       │
-        └───────────────────────┼───────────────────────┘
-                                │
-                    (POST /api/fetch-url or
-                   POST /api/parse-pdf-file)
-                                │
-        ┌───────────────────────┴───────────────────────┐
-        │                                               │
-        ▼                                               ▼
-   ┌─────────────┐                             ┌─────────────┐
-   │ BeautifulSoup│                             │  PyMuPDF    │
-   │ HTML Parser │                             │ PDF Extract │
-   └─────────────┘                             └─────────────┘
-        │                                               │
-        └───────────────────────┬───────────────────────┘
-                                │
-                        (clean text)
-                                │
-                                ▼
-                    ┌──────────────────────┐
-                    │  User asks question  │
-                    │ (POST /api/ask)      │
-                    └──────────────────────┘
-                                │
-                                ▼
-                    ┌──────────────────────┐
-                    │  Gemini 2.5 Flash    │
-                    │  (Grounding Engine)  │
-                    └──────────────────────┘
-                                │
-                    (with SYSTEM_PROMPT
-                     enforcing grounding)
-                                │
-                                ▼
-                    ┌──────────────────────┐
-                    │   JSON Response      │
-                    │ {                    │
-                    │   found: boolean,    │
-                    │   answer: string,    │
-                    │   excerpt: string,   │
-                    │   confidence: 0-100  │
-                    │ }                    │
-                    └──────────────────────┘
-```
+- A Wikipedia article or news page via URL
+- A research paper, policy document, or manual as a PDF
+- Any block of text pasted directly
 
-### Technology Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | HTML5, CSS3, Vanilla JavaScript |
-| **Backend** | FastAPI (Python) |
-| **LLM** | Google Gemini 2.5 Flash |
-| **HTTP Client** | httpx (async) |
-| **HTML Parsing** | BeautifulSoup4 |
-| **PDF Extraction** | PyMuPDF (fitz) |
-| **Server** | Uvicorn |
+Then ask questions in plain English. The right panel shows you the source excerpt alongside every answer, so you can verify it yourself. Ask something outside the source — you'll see the refusal in action. That moment is the point of the whole project.
 
 ---
 
-## 🚀 Getting Started
+## Tech stack
 
-### Prerequisites
+| Layer | Tool |
+|---|---|
+| Frontend | HTML, CSS, Vanilla JS — single file |
+| Backend | FastAPI + Python |
+| LLM | Google Gemini 2.5 Flash |
+| URL fetching | httpx (async) |
+| HTML cleaning | BeautifulSoup4 |
+| PDF extraction | PyMuPDF |
+| Server | Uvicorn |
+| Hosting | Azure App Service |
 
-- **Python 3.9+**
-- **Google API Key** for Gemini (get it from [AI Studio](https://aistudio.google.com/apikey))
+The frontend and backend run from one server. No separate build step, no webpack, no framework overhead. The HTML file is served directly by FastAPI at the root route.
 
-### Installation
+---
 
-1. **Clone or download** the project:
-   ```bash
-   cd Alactic
-   ```
+## Running it locally
 
-2. **Create a virtual environment**:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate      # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set your Gemini API key**:
-   ```bash
-   # On Windows (PowerShell):
-   $env:GEMINI_API_KEY = "your-key-here"
-   
-   # On Windows (CMD):
-   set GEMINI_API_KEY=your-key-here
-   
-   # On macOS/Linux:
-   export GEMINI_API_KEY="your-key-here"
-   ```
-
-### Running the App
+You need Python 3.9+ and a free Gemini API key from [aistudio.google.com](https://aistudio.google.com/apikey).
 
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Set your API key (Windows PowerShell)
+$env:GEMINI_API_KEY = "your-key-here"
+
+# Run
 python main.py
 ```
 
-The app will start on **http://localhost:8000**
+Open **http://localhost:8000** in your browser.
 
-You'll see:
-```
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started server process [XXXX]
-```
-
-Open your browser to `http://localhost:8000` and start asking questions!
+FastAPI generates live API documentation automatically at **http://localhost:8000/docs** — no extra work needed.
 
 ---
 
-## 📖 Usage Guide
+## How the grounding actually works
 
-### 1. Load a Source
+This is the part worth understanding if you want to know what's happening under the hood.
 
-**Option A: From a URL**
-- Click the "URL" tab
-- Paste a link (e.g., Wikipedia article, blog post, news)
-- Click "Fetch & Parse"
-- AnchorAI extracts and cleans the text
+When you ask a question, the backend constructs a prompt that contains three things — the system instructions, the full source document, and your question. The system instructions tell Gemini to return a JSON object with four fields: `found` (boolean), `answer` (string), `excerpt` (verbatim quote from source), and `confidence` (0–100 integer). It is told explicitly that if the answer is not in the source, it sets `found` to false and leaves the other fields empty.
 
-**Option B: Upload a PDF**
-- Click the "PDF" tab
-- Drag-and-drop a PDF or click to upload
-- Wait for text extraction
-- AnchorAI processes page by page
+Temperature is set to 0.1. This is deliberate — lower temperature means the model sticks closer to what is in front of it and invents less. Max tokens is capped at 800, which is enough for a focused answer and excerpt but not enough to wander.
 
-**Option C: Paste Text**
-- Click the "Text" tab
-- Paste or type content directly
-- Submit
-
-### 2. Ask Questions
-
-Once a source is loaded:
-- Type your question in the chat input
-- Press Enter or click Send
-- AnchorAI replies with:
-  - **Answer**: The direct answer from the source
-  - **Excerpt**: The exact passage it cited
-  - **Confidence**: 0–100 score of how well the source supports the answer
-  - **Status**: "Anchored · Ready" (green dot) means it's grounded
-
-### 3. Follow-Up Questions
-
-Continue asking—AnchorAI maintains conversation history to understand context while staying grounded in the original source.
-
-### 4. Reset
-
-Click "Reset" to clear the source and start fresh.
+When the JSON comes back, the backend validates and sanitises the shape before sending it to the frontend. If the parse fails for any reason, it returns a safe `found: false` response rather than crashing. The frontend then renders the answer and the excerpt side by side so you can see exactly what grounded what.
 
 ---
 
-## 🔌 API Reference
+## API reference
 
 ### `GET /`
-
-Serves the frontend HTML.
-
-**Response**: `text/html` (the AnchorAI interface)
+Returns the frontend HTML.
 
 ---
 
 ### `POST /api/fetch-url`
 
-Fetch and clean text from a URL.
+Fetches a webpage and returns clean text — navigation, scripts, ads, and footers stripped out.
 
-**Request**:
 ```json
+// Request
+{ "url": "https://example.com/article" }
+
+// Response
 {
+  "content": "Extracted clean text...",
+  "word_count": 1840,
   "url": "https://example.com/article"
 }
 ```
-
-**Response** (200):
-```json
-{
-  "content": "Clean extracted text...",
-  "word_count": 1234,
-  "url": "https://example.com/article"
-}
-```
-
-**Error Responses**:
-- `408 Request Timeout`: URL took too long to load
-- `400 Bad Request`: Invalid URL
-- `415 Unsupported Media Type`: Not HTML or plain text
-- `422 Unprocessable Entity`: Page has too little content
 
 ---
 
 ### `POST /api/parse-pdf-file`
 
-Extract text from an uploaded PDF.
+Accepts a PDF upload (multipart form data) and returns extracted text page by page.
 
-**Request**: Multipart form data with file field:
-```
-Content-Type: multipart/form-data
-file: <binary PDF data>
-```
-
-**Response** (200):
 ```json
+// Response
 {
-  "content": "Full extracted text from all pages...",
-  "page_count": 5,
-  "word_count": 2500,
-  "filename": "document.pdf"
+  "content": "Full document text...",
+  "page_count": 12,
+  "word_count": 4300,
+  "filename": "report.pdf"
 }
 ```
 
-**Error Responses**:
-- `415 Unsupported Media Type`: Not a PDF
-- `413 Payload Too Large`: PDF exceeds 20MB
-- `422 Unprocessable Entity`: PDF corrupted or encrypted
+PDF size limit is 20MB. Image-based or scanned PDFs won't extract — only text-based PDFs are supported.
 
 ---
 
 ### `POST /api/ask`
 
-Answer a question grounded in a source.
+The core endpoint. Takes a question, the source text, and optional conversation history. Returns a grounded answer.
 
-**Request**:
 ```json
+// Request
 {
-  "question": "What is the main topic?",
-  "source": "The source document text...",
-  "history": [
-    {"role": "user", "content": "First question"},
-    {"role": "assistant", "content": "First answer"}
-  ]
+  "question": "What is the main argument?",
+  "source": "The full source text...",
+  "history": []
 }
-```
 
-**Response** (200):
-```json
+// Response when found
 {
   "found": true,
-  "answer": "The main topic is...",
-  "excerpt": "Quoted verbatim from the source.",
-  "confidence": 92
+  "answer": "The main argument is...",
+  "excerpt": "Verbatim sentence from the source.",
+  "confidence": 88
 }
-```
 
-**When answer not found**:
-```json
+// Response when not found
 {
   "found": false,
   "answer": "",
@@ -305,186 +153,81 @@ Answer a question grounded in a source.
 }
 ```
 
-**Error Responses**:
-- `400 Bad Request`: Source too short or question too short
-- `502 Bad Gateway`: Gemini API error
-
 ---
 
-## 🧠 How the Grounding Works
-
-The magic is in the **SYSTEM_PROMPT**. When you ask a question, AnchorAI:
-
-1. **Embeds your source** into the prompt
-2. **Sends to Gemini** with explicit instructions:
-   - ✅ Only use the source document
-   - ✅ Return exact excerpts verbatim
-   - ✅ Rate confidence honestly
-   - ✅ Refuse gracefully if answer not in source
-3. **Returns structured JSON** with `found`, `answer`, `excerpt`, and `confidence`
-4. **Frontend displays** the answer with citation and provenance
-
-**Key safeguards**:
-- Low temperature (0.1) = more faithful, less creative
-- Max tokens capped at 800
-- System prompt is enforced before each request
-- JSON validation ensures consistent output format
-
----
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GEMINI_API_KEY` | Yes | Your Google Gemini API key |
-
-### Tuning Parameters (in `main.py`)
-
-- **Context limit**: ~12,000 words (line 96)  
-  → Increase/decrease in `extract_clean_text()` and `parse_pdf_file()`
-- **Model temperature**: 0.1 (line 308)  
-  → Lower = more faithful, higher = more creative
-- **Max tokens**: 800 (line 309)  
-  → Controls response length
-- **PDF file size**: 20MB max (line 456)  
-  → Increase/decrease as needed
-- **History window**: Last 6 turns (line 295)  
-  → Controls how much context is kept for follow-ups
-
----
-
-## 📋 Project Structure
+## Project structure
 
 ```
-Alactic/
-├── main.py                 # FastAPI backend + all API endpoints
-├── anchorai.html           # Frontend (HTML/CSS/JS all-in-one)
-├── requirements.txt        # Python dependencies
-├── README.md              # This file
-└── startup.sh             # Optional: startup script
+anchorai/
+├── main.py          — FastAPI backend, all three API endpoints
+├── anchorai.html    — Complete frontend in one file
+├── requirements.txt — Python dependencies
+├── startup.sh       — Azure App Service startup command
+└── README.md        — This file
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## Deployment
 
-### API Key Error
+Hosted on **Azure App Service**. The startup command is:
+
 ```
-ModuleNotFoundError: No module named 'google.generativeai'
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
-**Fix**: Reinstall requirements:
+
+`GEMINI_API_KEY` is set as an application environment variable in Azure Portal → Configuration → Application Settings.
+
+For local development just run `python main.py`. For production with multiple workers:
+
 ```bash
-pip install google-generativeai
-```
-
-### Port Already in Use
-```
-OSError: [Errno 48] Address already in use
-```
-**Fix**: Change port in `main.py` (last line) or kill the process:
-```bash
-# On Windows:
-netstat -ano | findstr :8000
-taskkill /PID <PID> /F
-
-# On macOS/Linux:
-lsof -i :8000
-kill <PID>
-```
-
-### PDF Won't Upload
-- Check file is actual PDF (not image scan)
-- Keep file under 20MB
-- Scanned/image-based PDFs won't extract (need OCR separately)
-
-### Gemini Returns Empty Answer
-- Source text might be truncated (>12,000 words)
-- Question might not be answerable from the source
-- Check confidence score—if 0, answer isn't in source
-
----
-
-## 🚢 Deployment
-
-### Local Development
-```bash
-python main.py
-```
-
-### Production (Gunicorn + Uvicorn)
-```bash
-pip install gunicorn
 gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000
 ```
 
-### Docker (Example)
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-ENV GEMINI_API_KEY=$GEMINI_API_KEY
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
+---
 
-Build and run:
-```bash
-docker build -t anchorai .
-docker run -e GEMINI_API_KEY=<your-key> -p 8000:8000 anchorai
-```
+## Configuration
+
+| Variable | Required | Where to get it |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes | [aistudio.google.com](https://aistudio.google.com) — free |
+
+Tunable parameters inside `main.py`:
+
+- **Word limit per source** — 12,000 words
+- **Temperature** — 0.1 (lower = more faithful, higher = more creative)
+- **Max output tokens** — 800
+- **Conversation history window** — last 6 turns
+- **PDF size cap** — 20MB
 
 ---
 
-## 📚 Dependencies
+## Troubleshooting
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `fastapi` | 0.115.5 | Web framework |
-| `uvicorn` | 0.32.1 | ASGI server |
-| `httpx` | 0.28.0 | Async HTTP client (URL fetching) |
-| `beautifulsoup4` | 4.12.3 | HTML parsing & cleaning |
-| `google-generativeai` | 0.8.3 | Gemini API client |
-| `python-multipart` | 0.0.12 | File upload handling |
-| `pymupdf` | 1.24.11 | PDF text extraction |
+**`KeyError: GEMINI_API_KEY`** — the environment variable isn't set. Set it in the same terminal window you run the server from.
 
----
+**Port 8000 already in use** — run `netstat -ano | findstr :8000` on Windows, find the PID, then `taskkill /PID <number> /F`.
 
-## 🎓 Use Cases
+**PDF shows no text** — the file is likely scanned or image-based. Only PDFs with actual embedded text layers work.
 
-- **Research**: Verify claims against source documents
-- **Legal**: Answer questions only from specific contracts or policies
-- **Customer Support**: Ground responses in knowledge base documents
-- **Education**: Quiz students on specific readings without hallucination
-- **News Analysis**: Ask questions about articles with exact citations
-- **Documentation**: Query product manuals with confidence scores
+**Gemini returns an empty answer** — either the question is genuinely not in the source (confidence will be 0) or the source was truncated at 12,000 words.
+
+**App loads on Azure but API calls fail** — check that `GEMINI_API_KEY` is set in Azure Portal → your app → Configuration → Application Settings.
 
 ---
 
-## 🔐 Security Considerations
+## Dependencies
 
-- **API Key**: Never commit `GEMINI_API_KEY` to version control. Use environment variables.
-- **Input Validation**: All endpoints validate inputs and enforce size limits.
-- **Error Handling**: Errors are caught and returned as JSON (no stack traces exposed).
-- **CORS**: Configure as needed for cross-origin requests.
-- **Rate Limiting**: Consider adding rate limiting for production.
-
----
-
-## 📝 License
-
-Built by **Alactic Inc.** as a demonstration of their technology. This is a sample project.
+| Package | Version | What it does |
+|---|---|---|
+| fastapi | 0.115.5 | Web framework |
+| uvicorn | 0.32.1 | ASGI server |
+| httpx | 0.28.0 | Async HTTP client for URL fetching |
+| beautifulsoup4 | 4.12.3 | Strips HTML noise from web pages |
+| google-generativeai | 0.8.3 | Gemini API client |
+| python-multipart | 0.0.12 | Handles PDF file uploads |
+| pymupdf | 1.24.11 | Extracts text from PDFs |
 
 ---
 
-## 🤝 Contributing
-
-Found a bug or want to improve AnchorAI? Open an issue or submit a pull request!
-
----
-
-## 📧 Support
-
-For questions or feedback, reach out through the official Alactic channels.
+*Built as part of the Alactic Inc. internship assignment. The project is a deliberate attempt to understand Alactic's core technical problem — data grounding — from the inside, at a scale that an intern can actually build and defend.*
