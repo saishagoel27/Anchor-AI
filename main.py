@@ -2,12 +2,12 @@ import os
 import json
 import re
 import httpx
-import google.generativeai as genai
 import fitz  # PyMuPDF
+import google.generativeai as genai
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware  
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
 
@@ -19,11 +19,12 @@ app = FastAPI(
     description="Source-grounded LLM chatbot. Every answer is traceable to a source document.",
     version="1.0.0"
 )
-# Enable CORS for frontend on any origin (safe for student project).
-# This allows requests from localhost:3000, any other domain, etc.
+
+# CORS — allows the frontend to call the API from any origin.
+# Safe for a student project; restrict allow_origins in production.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for student project
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -88,24 +89,30 @@ Rules you must follow without exception:
 def extract_clean_text(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
 
-    # Remove noise elements
     for tag in soup(["script", "style", "nav", "footer", "header",
                      "aside", "form", "noscript", "iframe", "svg"]):
         tag.decompose()
 
     text = soup.get_text(separator="\n")
 
-    # Collapse whitespace and blank lines
     lines = [line.strip() for line in text.splitlines()]
-    lines = [line for line in lines if len(line) > 30]  # drop short fragments
+    lines = [line for line in lines if len(line) > 30]
     clean = "\n".join(lines)
 
-    # Truncate to ~12,000 words to stay within Gemini's context safely
     words = clean.split()
     if len(words) > 12000:
         clean = " ".join(words[:12000]) + "\n\n[Source truncated for processing]"
 
     return clean
+
+
+# ─── UTILITY: TRUNCATE TEXT ───────────────────────────────────────────────────
+
+def truncate_to_12k(text: str) -> str:
+    words = text.split()
+    if len(words) > 12000:
+        return " ".join(words[:12000]) + "\n\n[Source truncated for processing]"
+    return text
 
 
 # ─── UTILITY: SAFE JSON PARSE ─────────────────────────────────────────────────
@@ -122,19 +129,28 @@ def parse_llm_json(raw: str) -> dict:
 async def serve_frontend():
     """Serve the AnchorAI frontend."""
     return FileResponse("anchorai.html")
+
+
 @app.get("/health")
 async def health_check():
     """
-    Health check endpoint for Azure App Service and load balancers.
+    Health check endpoint for Azure App Service.
     Returns 200 if the app is running and responsive.
     """
     return {"status": "ok", "service": "AnchorAI"}
+
 
 @app.post("/api/fetch-url")
 async def fetch_url(request: FetchURLRequest):
     """
     Fetch a URL and return clean, extracted text.
-    This is the Connect + Process stage — raw web content in, clean text out.
+    Strategy:
+      1. Try Jina AI Reader first — handles JS-heavy/React sites by
+         rendering them server-side and returning clean markdown.
+      2. Fall back to direct HTTP fetch + BeautifulSoup for simple
+         HTML pages if Jina fails or returns too little content.
+    This mirrors Alactic's own approach: browser automation for dynamic
+    sites, standard parsing for everything else.
     """
     headers = {
         "User-Agent": (
@@ -144,25 +160,64 @@ async def fetch_url(request: FetchURLRequest):
         )
     }
 
+    # ── Step 1: Try Jina Reader ───────────────────────────────────────────────
+    # Jina renders the page server-side (handles React/Next.js sites)
+    # and returns clean markdown text. Free, no API key, no extra packages.
+    jina_url = f"https://r.jina.ai/{request.url}"
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            jina_response = await client.get(jina_url, headers=headers)
+            if jina_response.status_code == 200:
+                clean_text = truncate_to_12k(jina_response.text.strip())
+                if len(clean_text) > 200:  # Jina returned meaningful content
+                    return {
+                        "content": clean_text,
+                        "word_count": len(clean_text.split()),
+                        "url": request.url
+                    }
+    except Exception:
+        pass  # Jina failed — fall through to direct fetch
+
+    # ── Step 2: Direct fetch fallback ────────────────────────────────────────
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             response = await client.get(request.url, headers=headers)
             response.raise_for_status()
     except httpx.TimeoutException:
-        raise HTTPException(status_code=408, detail="URL fetch timed out. Try pasting the text directly.")
+        raise HTTPException(
+            status_code=408,
+            detail="URL fetch timed out. Try pasting the text directly."
+        )
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=e.response.status_code, detail="Could not fetch URL.")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail="Could not fetch URL."
+        )
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid URL or unreachable page.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid URL or unreachable page."
+        )
 
     content_type = response.headers.get("content-type", "")
-    if "text/html" not in content_type and "text/plain" not in content_type:
-        raise HTTPException(status_code=415, detail="Only HTML and plain text pages are supported.")
+    if "application/pdf" in content_type:
+        raise HTTPException(
+            status_code=415,
+            detail="PDF detected. Use the Upload PDF tab instead."
+        )
+    if "image/" in content_type or "video/" in content_type or "audio/" in content_type:
+        raise HTTPException(
+            status_code=415,
+            detail="Media files are not supported. Paste the text directly instead."
+        )
 
     clean_text = extract_clean_text(response.text)
 
     if len(clean_text.strip()) < 100:
-        raise HTTPException(status_code=422, detail="Page has too little readable content. Try pasting the text directly.")
+        raise HTTPException(
+            status_code=422,
+            detail="Page has too little readable content. Try pasting the text directly."
+        )
 
     return {
         "content": clean_text,
@@ -193,7 +248,6 @@ async def ask(request: AskRequest):
             turns.append(f"{role}: {turn['content']}")
         history_text = "\n".join(turns) + "\n\n"
 
-    # Compose the full prompt
     prompt = f"""{SYSTEM_PROMPT}
 
 ---SOURCE DOCUMENT START---
@@ -227,7 +281,6 @@ Respond with ONLY the JSON object."""
             "confidence": 0
         }
 
-    # Validate and sanitise the result shape
     return {
         "found": bool(result.get("found", False)),
         "answer": str(result.get("answer", "")),
@@ -238,28 +291,29 @@ Respond with ONLY the JSON object."""
 
 # ─── PDF PARSING ──────────────────────────────────────────────────────────────
 
-from fastapi import UploadFile, File
-
 @app.post("/api/parse-pdf-file")
 async def parse_pdf_file(file: UploadFile = File(...)):
     """
     Receive a PDF file, extract clean text page by page, return as string.
     This is AnchorAI's ingestion layer for document uploads.
+    Uses PyMuPDF (fitz) — handles complex layouts, multi-column text,
+    and embedded fonts reliably.
     """
-
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=415, detail="Only PDF files are accepted here.")
 
     contents = await file.read()
 
-    # Safety cap — 20MB max
     if len(contents) > 20 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="PDF too large. Please use a file under 20MB.")
 
     try:
         doc = fitz.open(stream=contents, filetype="pdf")
     except Exception:
-        raise HTTPException(status_code=422, detail="Could not read PDF. File may be corrupted or encrypted.")
+        raise HTTPException(
+            status_code=422,
+            detail="Could not read PDF. File may be corrupted or encrypted."
+        )
 
     pages_text = []
     for page_num, page in enumerate(doc):
@@ -276,11 +330,7 @@ async def parse_pdf_file(file: UploadFile = File(...)):
         )
 
     full_text = "\n\n".join(pages_text)
-
-    # Truncate to ~12,000 words — same cap as URL fetcher, keeps behavior consistent
-    words = full_text.split()
-    if len(words) > 12000:
-        full_text = " ".join(words[:12000]) + "\n\n[Document truncated for processing]"
+    full_text = truncate_to_12k(full_text)
 
     return {
         "content": full_text,
