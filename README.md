@@ -3,17 +3,17 @@
 
 ---
 
-Most AI chatbots have a quiet problem nobody talks about. They answer everything — fluently, confidently, and sometimes completely wrong. You ask a question, you get an answer that sounds right, and you have no way of knowing whether it came from something real or was quietly invented. That gap between fluency and truth is what AnchorAI is designed to close.
+Most AI chatbots have a quiet problem nobody talks about. They answer everything fluently, confidently, and sometimes completely wrong. You ask a question, you get an answer that sounds right, and you have no way of knowing whether it came from something real or was quietly invented. That gap between fluency and truth is what AnchorAI is designed to close.
 
-The idea is simple. You give AnchorAI a source — a URL, a PDF, a block of text. From that point on, it only speaks from what it has been shown. Every answer comes with the exact sentence it pulled from. When something isn't in the source, it says so instead of guessing. No hallucinations. Full traceability.
+The idea is simple. You give AnchorAI a source a URL, a PDF, a block of text. From that point on, it only speaks from what it has been shown. Every answer comes with the exact sentence it pulled from. When something isn't in the source, it says so instead of guessing. No hallucinations. Full traceability.
 
-It is a small-scale version of the same problem Alactic Inc. is solving at enterprise scale — making AI responses grounded in real, verifiable data rather than statistical confidence.
+It is a small-scale version of the same problem Alactic Inc. is solving at enterprise scale  making AI responses grounded in real, verifiable data rather than statistical confidence.
 
 ---
 
 ## Why it works differently
 
-Every other chatbot is optimized to always have an answer. AnchorAI is optimized to know when it doesn't. That sounds like a limitation. It's actually the harder engineering problem — teaching a model to refuse gracefully is more interesting than teaching it to respond fluently.
+Every other chatbot is optimized to always have an answer. AnchorAI is optimized to know when it doesn't. That sounds like a limitation. It's actually the harder engineering problem, teaching a model to refuse gracefully is more interesting than teaching it to respond fluently.
 
 The grounding behavior lives in the system prompt. When you ask a question, the entire source document is embedded into the context alongside a strict set of rules: only answer from this, return the exact excerpt you used, score your confidence honestly, and say nothing if the answer isn't here. Low temperature keeps the model faithful. Structured JSON output keeps the responses consistent and parseable. The result is a chatbot that behaves like a careful researcher rather than a confident guesser.
 
@@ -27,7 +27,7 @@ Load any of these as a source:
 - A research paper, policy document, or manual as a PDF
 - Any block of text pasted directly
 
-Then ask questions in plain English. The right panel shows you the source excerpt alongside every answer, so you can verify it yourself. Ask something outside the source — you'll see the refusal in action. That moment is the point of the whole project.
+Then ask questions in plain English. The right panel shows you the source excerpt alongside every answer, so you can verify it yourself. Ask something outside the source, you'll see the refusal in action. That moment is the point of the whole project.
 
 ---
 
@@ -65,7 +65,7 @@ python main.py
 
 Open **http://localhost:8000** in your browser.
 
-FastAPI generates live API documentation automatically at **http://localhost:8000/docs** — no extra work needed.
+FastAPI generates live API documentation automatically at **http://localhost:8000/docs**, no extra work needed.
 
 ---
 
@@ -230,4 +230,4 @@ Tunable parameters inside `main.py`:
 
 ---
 
-*Built as part of the Alactic Inc. internship assignment. The project is a deliberate attempt to understand Alactic's core technical problem — data grounding — from the inside, at a scale that an intern can actually build and defend.*
+*Built as part of the Alactic Inc. internship assignment. The project is a deliberate attempt to understand Alactic's core technical problem data grounding from the inside, at a scale that an intern can actually build and defend.*
