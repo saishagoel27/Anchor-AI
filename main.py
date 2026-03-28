@@ -3,9 +3,9 @@ import json
 import re
 import httpx
 import google.generativeai as genai
+import fitz  # PyMuPDF
 
 from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
@@ -19,7 +19,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+api_key = os.environ.get("GEMINI_API_KEY")
+if not api_key:
+    raise RuntimeError(
+        "GEMINI_API_KEY environment variable is not set. "
+        "Get a free key at aistudio.google.com"
+    )
+genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 
@@ -216,17 +222,6 @@ Respond with ONLY the JSON object."""
 
 # ─── PDF PARSING ──────────────────────────────────────────────────────────────
 
-@app.post("/api/parse-pdf")
-async def parse_pdf(file: bytes = None):
-    """
-    Accept a PDF upload and return clean extracted text.
-    Uses PyMuPDF (fitz) — the same approach enterprise pipelines use
-    because it handles complex layouts, multi-column text, and embedded fonts.
-    """
-    from fastapi import UploadFile, File
-    raise HTTPException(status_code=400, detail="Use the /api/parse-pdf-file endpoint.")
-
-
 from fastapi import UploadFile, File
 
 @app.post("/api/parse-pdf-file")
@@ -235,7 +230,6 @@ async def parse_pdf_file(file: UploadFile = File(...)):
     Receive a PDF file, extract clean text page by page, return as string.
     This is AnchorAI's ingestion layer for document uploads.
     """
-    import fitz  # PyMuPDF
 
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=415, detail="Only PDF files are accepted here.")
