@@ -7,6 +7,7 @@ import fitz  # PyMuPDF
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware  
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
 
@@ -17,6 +18,15 @@ app = FastAPI(
     title="AnchorAI",
     description="Source-grounded LLM chatbot. Every answer is traceable to a source document.",
     version="1.0.0"
+)
+# Enable CORS for frontend on any origin (safe for student project).
+# This allows requests from localhost:3000, any other domain, etc.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for student project
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -112,7 +122,13 @@ def parse_llm_json(raw: str) -> dict:
 async def serve_frontend():
     """Serve the AnchorAI frontend."""
     return FileResponse("anchorai.html")
-
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for Azure App Service and load balancers.
+    Returns 200 if the app is running and responsive.
+    """
+    return {"status": "ok", "service": "AnchorAI"}
 
 @app.post("/api/fetch-url")
 async def fetch_url(request: FetchURLRequest):
