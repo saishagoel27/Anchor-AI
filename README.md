@@ -5,9 +5,8 @@
 
 Most AI chatbots have a quiet problem nobody talks about. They answer everything fluently, confidently, and sometimes completely wrong. You ask a question, you get an answer that sounds right, and you have no way of knowing whether it came from something real or was quietly invented. That gap between fluency and truth is what AnchorAI is designed to close.
 
-The idea is simple. You give AnchorAI a source in the form of a URL, a PDF, a block of text. From that point on, it only speaks from what it has been shown. Every answer comes with the exact sentence it pulled from. When something isn't in the source, it says NO instead of guessing. No hallucinations. Full traceability.
+The idea is simple. You give AnchorAI a source in the form of a URL, a PDF, a block of text. From that point on, it only speaks from what it has been shown. Every answer comes with the exact sentence it is pulled from. When something isn't in the source, it says NO instead of guessing. No hallucinations. Full traceability.
 
-It is a small-scale version of the same problem Alactic Inc. is solving at enterprise scale  making AI responses grounded in real, verifiable data rather than statistical confidence.
 
 ---
 
@@ -178,7 +177,7 @@ Hosted on **Azure App Service**. The startup command is:
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-`GEMINI_API_KEY` is set as an application environment variable in Azure Portal → Configuration → Application Settings.
+`GROQ_API_KEY` is set as an application environment variable in Azure Portal → Configuration → Application Settings.
 
 For local development just run `python main.py`. For production with multiple workers:
 
