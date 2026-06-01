@@ -3,3 +3,6 @@
 .env
 /__pycache__
 *.pyc
+.webappignore
+.deployment
+settings.json
