@@ -3,13 +3,17 @@ import json
 import re
 import httpx
 import fitz  # PyMuPDF
-import google.generativeai as genai
+from groq import Groq
+from dotenv import load_dotenv
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 # ─── APP SETUP ────────────────────────────────────────────────────────────────
@@ -20,8 +24,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS — allows the frontend to call the API from any origin.
-# Safe for a student project; restrict allow_origins in production.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,14 +32,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-api_key = os.environ.get("GEMINI_API_KEY")
+api_key = os.environ.get("GROQ_API_KEY")
 if not api_key:
     raise RuntimeError(
-        "GEMINI_API_KEY environment variable is not set. "
-        "Get a free key at aistudio.google.com"
+        "GROQ_API_KEY environment variable is not set. "
+        "Get a free key at console.groq.com"
     )
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-2.5-flash")
+
+client = Groq(api_key=api_key)
 
 
 # ─── REQUEST MODELS ───────────────────────────────────────────────────────────
@@ -53,7 +55,7 @@ class AskRequest(BaseModel):
 
 # ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
 # This is the core of AnchorAI. The entire grounding behavior lives here.
-# It instructs Gemini to:
+# It instructs the LLM to:
 #   (1) Only answer from the provided source
 #   (2) Always return the exact excerpt it used
 #   (3) Return a confidence score reflecting how well the source supports the answer
@@ -83,8 +85,6 @@ Rules you must follow without exception:
 
 
 # ─── UTILITY: CLEAN TEXT EXTRACTION ──────────────────────────────────────────
-# Strips HTML to clean readable text — removes nav, footer, scripts, ads.
-# This is the "ingestion" step. The cleaner the input, the better the grounding.
 
 def extract_clean_text(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
@@ -94,29 +94,24 @@ def extract_clean_text(html: str) -> str:
         tag.decompose()
 
     text = soup.get_text(separator="\n")
-
     lines = [line.strip() for line in text.splitlines()]
     lines = [line for line in lines if len(line) > 30]
     clean = "\n".join(lines)
 
-    words = clean.split()
-    if len(words) > 12000:
-        clean = " ".join(words[:12000]) + "\n\n[Source truncated for processing]"
-
-    return clean
+    return truncate_to_12k(clean)
 
 
 # ─── UTILITY: TRUNCATE TEXT ───────────────────────────────────────────────────
 
 def truncate_to_12k(text: str) -> str:
     words = text.split()
-    if len(words) > 12000:
-        return " ".join(words[:12000]) + "\n\n[Source truncated for processing]"
+    # Use 1.5k words ≈ 2k tokens + system prompt + response = ~3.5k total
+    if len(words) > 1500:
+        return " ".join(words[:1500]) + "\n\n[Source truncated to fit model limits]"
     return text
 
 
 # ─── UTILITY: SAFE JSON PARSE ─────────────────────────────────────────────────
-# Gemini sometimes wraps JSON in markdown code fences. This strips them cleanly.
 
 def parse_llm_json(raw: str) -> dict:
     cleaned = re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
@@ -133,24 +128,16 @@ async def serve_frontend():
 
 @app.get("/health")
 async def health_check():
-    """
-    Health check endpoint for Azure App Service.
-    Returns 200 if the app is running and responsive.
-    """
+    """Health check endpoint for Azure App Service."""
     return {"status": "ok", "service": "AnchorAI"}
 
 
 @app.post("/api/fetch-url")
 async def fetch_url(request: FetchURLRequest):
     """
-    Fetch a URL and return clean, extracted text.
-    Strategy:
-      1. Try Jina AI Reader first — handles JS-heavy/React sites by
-         rendering them server-side and returning clean markdown.
-      2. Fall back to direct HTTP fetch + BeautifulSoup for simple
-         HTML pages if Jina fails or returns too little content.
-    This mirrors Alactic's own approach: browser automation for dynamic
-    sites, standard parsing for everything else.
+    Fetch a URL and return clean extracted text.
+    Tries Jina AI Reader first for JS-heavy sites,
+    falls back to direct BeautifulSoup fetch for simple HTML.
     """
     headers = {
         "User-Agent": (
@@ -161,22 +148,20 @@ async def fetch_url(request: FetchURLRequest):
     }
 
     # ── Step 1: Try Jina Reader ───────────────────────────────────────────────
-    # Jina renders the page server-side (handles React/Next.js sites)
-    # and returns clean markdown text. Free, no API key, no extra packages.
     jina_url = f"https://r.jina.ai/{request.url}"
     try:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
             jina_response = await client.get(jina_url, headers=headers)
             if jina_response.status_code == 200:
                 clean_text = truncate_to_12k(jina_response.text.strip())
-                if len(clean_text) > 200:  # Jina returned meaningful content
+                if len(clean_text) > 200:
                     return {
                         "content": clean_text,
                         "word_count": len(clean_text.split()),
                         "url": request.url
                     }
     except Exception:
-        pass  # Jina failed — fall through to direct fetch
+        pass
 
     # ── Step 2: Direct fetch fallback ────────────────────────────────────────
     try:
@@ -229,9 +214,9 @@ async def fetch_url(request: FetchURLRequest):
 @app.post("/api/ask")
 async def ask(request: AskRequest):
     """
-    Answer a question, grounded strictly in the provided source.
-    Returns the answer, the supporting excerpt, and a confidence score.
-    This is the Transform stage — source + question in, structured intelligence out.
+    Answer a question grounded strictly in the provided source.
+    Uses Groq's llama-3.3-70b-versatile — fast, reliable, strong
+    instruction following for structured JSON output.
     """
     if not request.source or len(request.source.strip()) < 50:
         raise HTTPException(status_code=400, detail="Source content is too short.")
@@ -239,11 +224,18 @@ async def ask(request: AskRequest):
     if not request.question or len(request.question.strip()) < 2:
         raise HTTPException(status_code=400, detail="Question is too short.")
 
-    # Build conversation context from recent history
+    # Ensure source is within token limits
+    source_text = truncate_to_12k(request.source)
+    
+    # Debug: print actual word count
+    word_count = len(source_text.split())
+    print(f"Source word count after truncation: {word_count}")
+
+    # Build conversation context
     history_text = ""
     if request.history:
         turns = []
-        for turn in request.history[-6:]:  # last 3 exchanges max
+        for turn in request.history[-6:]:
             role = "User" if turn["role"] == "user" else "AnchorAI"
             turns.append(f"{role}: {turn['content']}")
         history_text = "\n".join(turns) + "\n\n"
@@ -251,29 +243,34 @@ async def ask(request: AskRequest):
     prompt = f"""{SYSTEM_PROMPT}
 
 ---SOURCE DOCUMENT START---
-{request.source}
+{source_text}
 ---SOURCE DOCUMENT END---
 
 {history_text}User question: {request.question}
 
 Respond with ONLY the JSON object."""
+    
+    # Debug: estimate token count
+    estimated_tokens = len(prompt.split()) * 1.33
+    print(f"Estimated prompt tokens: {int(estimated_tokens)}")
 
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.1,       # low temperature = more faithful, less creative
-                max_output_tokens=800,
-            )
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=800,
         )
-        raw = response.text
+        raw = response.choices[0].message.content
     except Exception as e:
+        print(f"Groq API Error: {str(e)}")
         raise HTTPException(status_code=502, detail=f"LLM error: {str(e)}")
 
     try:
         result = parse_llm_json(raw)
-    except json.JSONDecodeError:
-        # Fallback: if JSON parsing fails, return a safe not-found response
+    except json.JSONDecodeError as e:
+        print(f"JSON Parse Error: {str(e)}")
+        print(f"Raw response: {raw}")
         return {
             "found": False,
             "answer": "",
@@ -294,10 +291,8 @@ Respond with ONLY the JSON object."""
 @app.post("/api/parse-pdf-file")
 async def parse_pdf_file(file: UploadFile = File(...)):
     """
-    Receive a PDF file, extract clean text page by page, return as string.
-    This is AnchorAI's ingestion layer for document uploads.
-    Uses PyMuPDF (fitz) — handles complex layouts, multi-column text,
-    and embedded fonts reliably.
+    Extract clean text from a PDF upload, page by page.
+    Uses PyMuPDF — handles complex layouts and embedded fonts.
     """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=415, detail="Only PDF files are accepted here.")
@@ -329,8 +324,7 @@ async def parse_pdf_file(file: UploadFile = File(...)):
             detail="No readable text found. This PDF may be scanned or image-based."
         )
 
-    full_text = "\n\n".join(pages_text)
-    full_text = truncate_to_12k(full_text)
+    full_text = truncate_to_12k("\n\n".join(pages_text))
 
     return {
         "content": full_text,
