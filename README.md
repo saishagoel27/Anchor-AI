@@ -2,7 +2,7 @@
 ### *Ask anything. Anchored to everything.*
 
 ---
-Go Try it out - https://anchorai-cuarfcf4ceapambw.centralindia-01.azurewebsites.net/
+### *Go Try it out - https://anchorai-cuarfcf4ceapambw.centralindia-01.azurewebsites.net/*
 ---
 Most AI chatbots have a quiet problem nobody talks about. They answer everything fluently, confidently, and sometimes completely wrong. You ask a question, you get an answer that sounds right, and you have no way of knowing whether it came from something real or was quietly invented. That gap between fluency and truth is what AnchorAI is designed to close.
 
