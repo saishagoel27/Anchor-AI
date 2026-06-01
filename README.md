@@ -1,9 +1,8 @@
-# AnchorAI
-### *Ask anything. Anchored to everything.*
+# AnchorAI - ### *Ask anything. Anchored to everything.*
 
 ---
 ### *Go Try it out - https://anchorai-cuarfcf4ceapambw.centralindia-01.azurewebsites.net/*
----
+
 Most AI chatbots have a quiet problem nobody talks about. They answer everything fluently, confidently, and sometimes completely wrong. You ask a question, you get an answer that sounds right, and you have no way of knowing whether it came from something real or was quietly invented. That gap between fluency and truth is what AnchorAI is designed to close.
 
 The idea is simple. You give AnchorAI a source in the form of a URL, a PDF, a block of text. From that point on, it only speaks from what it has been shown. Every answer comes with the exact sentence it pulled from. When something isn't in the source, it says NO instead of guessing. No hallucinations. Full traceability.
