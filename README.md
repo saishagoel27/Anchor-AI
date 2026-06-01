@@ -1,4 +1,4 @@
-# AnchorAI - ### *Ask anything. Anchored to everything.*
+### AnchorAI - *Ask anything. Anchored to everything.*
 
 ---
 ### *Go Try it out - https://anchorai-cuarfcf4ceapambw.centralindia-01.azurewebsites.net/*
