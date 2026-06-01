@@ -103,7 +103,7 @@ def extract_clean_text(html: str) -> str:
 
 # ─── UTILITY: TRUNCATE TEXT ───────────────────────────────────────────────────
 
-def truncate_to_12k(text: str) -> str:
+def truncate_to_text(text: str) -> str:
     words = text.split()
     # Use 1.5k words ≈ 2k tokens + system prompt + response = ~3.5k total
     if len(words) > 1500:
