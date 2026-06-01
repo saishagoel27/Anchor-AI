@@ -229,5 +229,3 @@ Tunable parameters inside `main.py`:
 | pymupdf | 1.24.11 | Extracts text from PDFs |
 
 ---
-
-*Built as part of the Alactic Inc. internship assignment. The project is a deliberate attempt to understand Alactic's core technical problem data grounding from the inside, at a scale that an intern can actually build and defend.*
