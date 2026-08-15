@@ -36,7 +36,7 @@ Then ask questions in plain English. The right panel shows you the source excerp
 |---|---|
 | Frontend | HTML, CSS, Vanilla JS — single file |
 | Backend | FastAPI + Python |
-| LLM | Groq Llama 3.3 70B Versatile |
+| LLM | Fallback chain (Llama 3.1 8B, Qwen 27B, etc.) via Groq API |
 | URL fetching | httpx (async) |
 | HTML cleaning | BeautifulSoup4 |
 | PDF extraction | PyMuPDF |
@@ -200,7 +200,7 @@ Tunable parameters inside `main.py`:
 - **Max output tokens** — 800
 - **Conversation history window** — last 6 turns
 - **PDF size cap** — 20MB
-- **Model** — llama-3.3-70b-versatile
+- **Models (Fallback System)** — llama-3.1-8b-instant, openai/gpt-oss-20b, groq/compound, qwen/qwen3.6-27b
 
 ---
 
