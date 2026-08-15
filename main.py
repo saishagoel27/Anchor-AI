@@ -224,8 +224,8 @@ async def fetch_url(request: FetchURLRequest):
 async def ask(request: AskRequest):
     """
     Answer a question grounded strictly in the provided source.
-    Uses Groq's llama-3.3-70b-versatile — fast, reliable, strong
-    instruction following for structured JSON output.
+    Uses a fallback chain of models (Llama 3.1 8B, Qwen, etc) for
+    reliable instruction following and JSON output.
     """
     if not request.source or len(request.source.strip()) < 50:
         raise HTTPException(status_code=400, detail="Source content is too short.")
